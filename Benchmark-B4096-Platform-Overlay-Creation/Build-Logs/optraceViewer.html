@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+
+<html>
+<!-- Styles -->
+<style>
+    #chartdiv {
+      width: 100%;
+      height: 1000px;
+    }
+</style>
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>OPTraceViewer</title>
+  <script src="https://www.amcharts.com/lib/3/amcharts.js">
+  </script>
+  <script src="https://www.amcharts.com/lib/3/serial.js">
+  </script>
+  <script src="https://www.amcharts.com/lib/3/gantt.js">
+  </script>
+  <script src="https://www.amcharts.com/lib/3/themes/light.js">
+  </script>
+  <script src="https://www.amcharts.com/lib/3/plugins/export/export.min.js">
+  </script>
+  <link rel="stylesheet" href="https://www.amcharts.com/lib/3/plugins/export/export.css" type="text/css" media="all"/>
+
+  <form name="userInputForm" action="javascript:userInputFormCallback()">
+    <fieldset>
+    <legend>Graph Filters:</legend>
+    <table style="width:100%">
+      <col width="50"></col>
+      <col width="20"></col>
+      <col width="60"></col>
+      <tr>
+        <td style="text-align: center"; colspan="3"><input type="number" name="userDurationFilterSecInput" id="userDurationFilterSecInput" value="2" min="0" max="6000" step="1"> sec</td>
+        <td>Filter out run durations lower than this value</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td style="text-align: center"><input type="checkbox" name="userGroupPidSortSelected" id="userGroupPidSortSelected"></td>
+        <td>Group sort by process ID</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td bgcolor="#0099ff"></td>
+        <td style="text-align: center"><input type="checkbox" name="userRollupSelected" id="userRollupSelected"></td>
+        <td>Show rollup entries</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td bgcolor="#8dc49f"></td>
+        <td style="text-align: center"><input type="checkbox" name="userIndividualEntrySelected" id="userIndividualEntrySelected"></td>
+        <td>Show individual entries</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td bgcolor="#cd82ad"></td>
+        <td style="text-align: center"><input type="checkbox" name="userCheckpointEntrySelected" id="userCheckpointEntrySelected"></td>
+        <td>Show checkpoints entry</td>
+      </tr>
+       <tr>
+        <td></td>
+        <td bgcolor="#b9783f"></td>
+        <td style="text-align: center"><input type="checkbox" name="userReportEntrySelected" id="userReportEntrySelected"></td>
+        <td>Show report entry</td>
+      </tr>
+
+    </table>
+    <br>
+    <input name="Submit" type="submit" value="Update Graph">
+    </fieldset>
+  </form> 
+
+  <div id="chartdiv">
+  </div>
+
+  <script>
+  </script>
+
+</head>
+
+
+<body>
+<table id="myDynamicTable" cellpadding="2" cellspacing="2" border="1" onclick="tester()">
+  <tr>
+  <td>Task</td>
+  <td>Start</td>
+  <td>Duration</td>
+  </tr>
+</table>
+<script>
+  // Default User Selected variables
+  var m_secondFilter = 1;
+  var m_groupPidSort = true;
+  var m_showRollup = true;
+  var m_showIndividualEntry = false;
+  var m_showCheckpointEntry = false;
+  var m_showReportEntry = false;
+
+  function SetDefaultUserValues()
+  {
+    document.getElementById("userDurationFilterSecInput").value = m_secondFilter;
+    document.getElementById("userGroupPidSortSelected").checked = m_groupPidSort;
+    document.getElementById("userRollupSelected").checked = m_showRollup;
+    document.getElementById("userIndividualEntrySelected").checked = m_showIndividualEntry;
+    document.getElementById("userCheckpointEntrySelected").checked = m_showCheckpointEntry;
+    document.getElementById("userReportEntrySelected").checked = m_showReportEntry;
+  }
+
+  window.onload = function(){
+    SetDefaultUserValues();
+  }
+
+
+
+
+  // Header
+  var header = "Keyword|pid|Entry|SrcFile|Catagory|TimeStampMSec|Action|Task|Tags|Misc";
+                         
+  // Insert Raw Data Here
+  // Note: Do not change the following signature. 
+  var csvData =    [
+      "[OPTRACE]|12091|10|run|cpp|1729689606020|START|OCL_LINK|",
+      "[OPTRACE]|12091|11|setupBinaryForLink|cpp|1729689606020|START|Create Binary|",
+      "[OPTRACE]|12091|12||cpp|1729689606021|END|Create Binary|",
+      "[OPTRACE]|12091|13|setupBinaryForLink|cpp|1729689606021|START|Extract Kernels|",
+      "[OPTRACE]|12091|14||cpp|1729689606049|END|Extract Kernels|",
+      "[OPTRACE]|12091|15|launchStep_|cpp|1729689606144|START|Launch Step: system_link|",
+      "[OPTRACE]|12091|16||cpp|1729689612027|END|Launch Step: system_link|",
+      "[OPTRACE]|12091|17|launchStep_|cpp|1729689612027|START|Launch Step: cf2sw|",
+      "[OPTRACE]|12091|18||cpp|1729689613159|END|Launch Step: cf2sw|",
+      "[OPTRACE]|12091|19|launchStep_|cpp|1729689613159|START|Launch Step: rtd2_system_diagram|",
+      "[OPTRACE]|12091|1|main|cpp|1729689595132|START|v++|ROLLUP_0",
+      "[OPTRACE]|12091|20||cpp|1729689613204|END|Launch Step: rtd2_system_diagram|",
+      "[OPTRACE]|12091|21|launchStep_|cpp|1729689613205|START|Launch Step: vpl|",
+      "[OPTRACE]|12091|2|run|cpp|1729689595132|START|Validate Kernels|",
+      "[OPTRACE]|12091|352||cpp|1729691294581|END|Launch Step: vpl|",
+      "[OPTRACE]|12091|353|launchStep_|cpp|1729691294581|START|Launch Step: rtdgen|",
+      "[OPTRACE]|12091|354|launchCf2sw_|cpp|1729691294583|START|Launch cf2sw|",
+      "[OPTRACE]|12091|355||cpp|1729691295632|END|Launch cf2sw|",
+      "[OPTRACE]|12091|356|writeSystemDiagram|cpp|1729691295632|START|writeSystemDiagram|",
+      "[OPTRACE]|12091|357||cpp|1729691295635|END|writeSystemDiagram|",
+      "[OPTRACE]|12091|358|writeAutomationSummary|cpp|1729691295635|START|writeAutomationSummary|",
+      "[OPTRACE]|12091|359||cpp|1729691295637|END|writeAutomationSummary|",
+      "[OPTRACE]|12091|360||cpp|1729691295637|END|Launch Step: rtdgen|",
+      "[OPTRACE]|12091|361|launchStep_|cpp|1729691295638|START|Launch Step: xclbinutil|",
+      "[OPTRACE]|12091|362||cpp|1729691296405|END|Launch Step: xclbinutil|",
+      "[OPTRACE]|12091|363|launchStep_|cpp|1729691296405|START|Launch Step: xclbinutilinfo|",
+      "[OPTRACE]|12091|364||cpp|1729691297128|END|Launch Step: xclbinutilinfo|",
+      "[OPTRACE]|12091|365|launchStep_|cpp|1729691297128|START|Launch Step: generate_sc_driver|",
+      "[OPTRACE]|12091|366||cpp|1729691297130|END|Launch Step: generate_sc_driver|",
+      "[OPTRACE]|12091|367||cpp|1729691297131|END|OCL_LINK|",
+      "[OPTRACE]|12091|368||cpp|1729691297894|END|v++|",
+      "[OPTRACE]|12091|3||cpp|1729689595139|END|Validate Kernels|",
+      "[OPTRACE]|12091|4|prepareProject|cpp|1729689595153|START|Create Solution|",
+      "[OPTRACE]|12091|5||cpp|1729689605723|END|Create Solution|",
+      "[OPTRACE]|12091|6|prepareProject|cpp|1729689605723|START|Add Device|",
+      "[OPTRACE]|12091|7|addDevice|cpp|1729689605723|START|Find & Load Device|",
+      "[OPTRACE]|12091|8||cpp|1729689605728|END|Find & Load Device|",
+      "[OPTRACE]|12091|9||cpp|1729689605970|END|Add Device|",
+      "[OPTRACE]|12440|22|main|cpp|1729689614021|START|vpl|",
+      "[OPTRACE]|12440|23|runPlatformLinker|cpp|1729689614036|START|runPlatformLinker|",
+      "[OPTRACE]|12440|24|setupBinaryForLink|cpp|1729689614036|START|Create Solution|",
+      "[OPTRACE]|12440|25||cpp|1729689614040|END|Create Solution|",
+      "[OPTRACE]|12440|26|setupBinaryForLink|cpp|1729689614040|START|Add platform|",
+      "[OPTRACE]|12440|27||cpp|1729689614253|END|Add platform|",
+      "[OPTRACE]|12440|28|setupBinaryForLink|cpp|1729689614253|START|Create Binary|",
+      "[OPTRACE]|12440|29||cpp|1729689614254|END|Create Binary|",
+      "[OPTRACE]|12440|30|setupBinaryForLink|cpp|1729689614254|START|Create Kernels|",
+      "[OPTRACE]|12440|31||cpp|1729689614254|END|Create Kernels|",
+      "[OPTRACE]|12440|32|runPlatformLinker|cpp|1729689614260|START|Process Kernels|",
+      "[OPTRACE]|12440|33|runPlatformLinker|cpp|1729689614260|START|Set Board Repo Paths and Connections|",
+      "[OPTRACE]|12440|348|runPlatformLinker|cpp|1729691294558|START|Generate Resource Availability Report|",
+      "[OPTRACE]|12440|349||cpp|1729691294558|END|Generate Resource Availability Report|",
+      "[OPTRACE]|12440|34||cpp|1729689614260|END|Set Board Repo Paths and Connections|",
+      "[OPTRACE]|12440|350||cpp|1729691294558|END|runPlatformLinker|",
+      "[OPTRACE]|12440|351||cpp|1729691294569|END|vpl|",
+      "[OPTRACE]|12440|35|runPlatformLinker|cpp|1729689614260|START|Process Kernel Profiles|",
+      "[OPTRACE]|12440|36||cpp|1729689614260|END|Process Kernel Profiles|",
+      "[OPTRACE]|12440|37|runPlatformLinker|cpp|1729689614260|START|Process Trace Memory|",
+      "[OPTRACE]|12440|38||cpp|1729689614260|END|Process Trace Memory|",
+      "[OPTRACE]|12440|39|runPlatformLinker|cpp|1729689614260|START|Process AIE Trace|",
+      "[OPTRACE]|12440|40||cpp|1729689614260|END|Process AIE Trace|",
+      "[OPTRACE]|12440|41||cpp|1729689614260|END|Process Kernels|",
+      "[OPTRACE]|12440|42|runPlatformLinker|cpp|1729689614260|START|Process Kernel Debug|",
+      "[OPTRACE]|12440|43||cpp|1729689614260|END|Process Kernel Debug|",
+      "[OPTRACE]|12440|44|runPlatformLinker|cpp|1729689614260|START|Set Kernel Debug|",
+      "[OPTRACE]|12440|45||cpp|1729689614260|END|Set Kernel Debug|",
+      "[OPTRACE]|12440|46|runPlatformLinker|cpp|1729689614260|START|Set Miscellaneous|",
+      "[OPTRACE]|12440|47||cpp|1729689614260|END|Set Miscellaneous|",
+      "[OPTRACE]|12440|48|run|cpp|1729689614260|START|Extract Platform|",
+      "[OPTRACE]|12440|49||cpp|1729689614457|END|Extract Platform|",
+      "[OPTRACE]|12521|250|ipirun.tcl|vpl|1729690062540|END|Synthesis|",
+      "[OPTRACE]|12521|347|ipirun.tcl|vpl|1729691294226|END|Implementation|",
+      "[OPTRACE]|12521|50|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/vpl.tcl|vivado_impl|1729689617918|START|Implementation|ROLLUP_1",
+      "[OPTRACE]|12521|51|ipirun.tcl|vpl|1729689617943|START|ipirun|ROLLUP_0",
+      "[OPTRACE]|12521|52|ipirun.tcl|vpl|1729689617943|END|ipirun|",
+      "[OPTRACE]|12521|53|ipirun.tcl|vpl|1729689617956|START|Create project|",
+      "[OPTRACE]|12521|54|ipirun.tcl|vpl|1729689623815|END|Create project|",
+      "[OPTRACE]|12521|55|ipirun.tcl|vpl|1729689623817|START|Create IP caching environment|",
+      "[OPTRACE]|12521|56|ipirun.tcl|vpl|1729689624184|END|Create IP caching environment|",
+      "[OPTRACE]|12521|57|ipirun.tcl|vpl|1729689624185|START|Import/add dynamic BD|",
+      "[OPTRACE]|12521|58|ipirun.tcl|vpl|1729689624185|END|Import/add dynamic BD|",
+      "[OPTRACE]|12521|59|ipirun.tcl|vpl|1729689624186|START|Open BD and insert kernels|",
+      "[OPTRACE]|12521|60|ipirun.tcl|vpl|1729689658373|END|Open BD and insert kernels|",
+      "[OPTRACE]|12521|61|ipirun.tcl|vpl|1729689658374|START|Add debug/profiling support|",
+      "[OPTRACE]|12521|62|ipirun.tcl|vpl|1729689658385|END|Add debug/profiling support|",
+      "[OPTRACE]|12521|63|ipirun.tcl|vpl|1729689658385|START|IPI address assignments|",
+      "[OPTRACE]|12521|64|ipirun.tcl|vpl|1729689658474|END|IPI address assignments|",
+      "[OPTRACE]|12521|65|ipirun.tcl|vpl|1729689658476|START|Create address map and debug IP profile files|",
+      "[OPTRACE]|12521|66|ipirun.tcl|vpl|1729689658479|END|Create address map and debug IP profile files|",
+      "[OPTRACE]|12521|67|ipirun.tcl|vpl|1729689658479|START|Collect BD interface connectivity and write automation summary report|",
+      "[OPTRACE]|12521|68|ipirun.tcl|vpl|1729689658484|END|Collect BD interface connectivity and write automation summary report|",
+      "[OPTRACE]|12521|69|ipirun.tcl|vpl|1729689658514|START|Generate output products|",
+      "[OPTRACE]|12521|70|ipirun.tcl|vpl|1729689682063|END|Generate output products|",
+      "[OPTRACE]|12521|71|ipirun.tcl|vpl|1729689682065|START|Source report_commands_tcl|",
+      "[OPTRACE]|12521|72|ipirun.tcl|vpl|1729689682087|END|Source report_commands_tcl|",
+      "[OPTRACE]|12521|73|ipirun.tcl|vpl|1729689682088|START|Source synth_props_tcl|",
+      "[OPTRACE]|12521|74|ipirun.tcl|vpl|1729689683477|END|Source synth_props_tcl|",
+      "[OPTRACE]|12521|75|ipirun.tcl|vpl|1729689683481|START|Source impl_props_tcl|",
+      "[OPTRACE]|12521|76|ipirun.tcl|vpl|1729689683513|END|Source impl_props_tcl|",
+      "[OPTRACE]|12521|77|ipirun.tcl|vpl|1729689683515|START|Synthesis|ROLLUP_1,SYNTH",
+      "[OPTRACE]|13167|100|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691761|END|Creating in-memory project|",
+      "[OPTRACE]|13167|101|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691761|START|Adding files|",
+      "[OPTRACE]|13167|118|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691991|END|Adding files|",
+      "[OPTRACE]|13167|119|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691992|START|Configure IP Cache|",
+      "[OPTRACE]|13167|120|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691993|END|Configure IP Cache|",
+      "[OPTRACE]|13167|121|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689691993|START|synth_design|",
+      "[OPTRACE]|13167|230|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689992809|END|synth_design|",
+      "[OPTRACE]|13167|231|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689992809|START|Write IP Cache|",
+      "[OPTRACE]|13167|232|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690007420|END|Write IP Cache|",
+      "[OPTRACE]|13167|233|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690007443|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13167|234|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690021089|END|write_checkpoint|",
+      "[OPTRACE]|13167|235|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690021089|START|synth reports|REPORT",
+      "[OPTRACE]|13167|236|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690021649|END|synth reports|",
+      "[OPTRACE]|13167|237|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729690022339|END|system_DPUCZDX8G_1_0_synth_1|",
+      "[OPTRACE]|13167|88|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689687900|START|system_DPUCZDX8G_1_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13167|89|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_DPUCZDX8G_1_0_synth_1/system_DPUCZDX8G_1_0.tcl|vivado_synth|1729689687900|START|Creating in-memory project|",
+      "[OPTRACE]|13168|114|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691940|END|Adding files|",
+      "[OPTRACE]|13168|115|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691940|START|Configure IP Cache|",
+      "[OPTRACE]|13168|116|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691982|END|Configure IP Cache|",
+      "[OPTRACE]|13168|117|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691983|START|synth_design|",
+      "[OPTRACE]|13168|194|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689735065|END|synth_design|",
+      "[OPTRACE]|13168|195|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689735065|START|Write IP Cache|",
+      "[OPTRACE]|13168|196|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689735841|END|Write IP Cache|",
+      "[OPTRACE]|13168|197|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689735842|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13168|198|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689736070|END|write_checkpoint|",
+      "[OPTRACE]|13168|199|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689736071|START|synth reports|REPORT",
+      "[OPTRACE]|13168|200|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689736199|END|synth reports|",
+      "[OPTRACE]|13168|213|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689736773|END|system_auto_us_0_synth_1|",
+      "[OPTRACE]|13168|78|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689687855|START|system_auto_us_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13168|79|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689687856|START|Creating in-memory project|",
+      "[OPTRACE]|13168|96|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691697|END|Creating in-memory project|",
+      "[OPTRACE]|13168|97|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_us_0_synth_1/system_auto_us_0.tcl|vivado_synth|1729689691697|START|Adding files|",
+      "[OPTRACE]|13170|108|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689691857|END|Creating in-memory project|",
+      "[OPTRACE]|13170|109|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689691857|START|Adding files|",
+      "[OPTRACE]|13170|130|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689692113|END|Adding files|",
+      "[OPTRACE]|13170|131|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689692114|START|Configure IP Cache|",
+      "[OPTRACE]|13170|132|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689692115|END|Configure IP Cache|",
+      "[OPTRACE]|13170|133|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689692115|START|synth_design|",
+      "[OPTRACE]|13170|142|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689724815|END|synth_design|",
+      "[OPTRACE]|13170|143|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689724815|START|Write IP Cache|",
+      "[OPTRACE]|13170|148|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689725412|END|Write IP Cache|",
+      "[OPTRACE]|13170|149|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689725412|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13170|154|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689725549|END|write_checkpoint|",
+      "[OPTRACE]|13170|155|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689725549|START|synth reports|REPORT",
+      "[OPTRACE]|13170|160|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689725667|END|synth reports|",
+      "[OPTRACE]|13170|163|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689726085|END|system_clk_wiz_1_synth_1|",
+      "[OPTRACE]|13170|80|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689687856|START|system_clk_wiz_1_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13170|81|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_clk_wiz_1_synth_1/system_clk_wiz_1.tcl|vivado_synth|1729689687857|START|Creating in-memory project|",
+      "[OPTRACE]|13175|102|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689691772|END|Creating in-memory project|",
+      "[OPTRACE]|13175|103|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689691772|START|Adding files|",
+      "[OPTRACE]|13175|122|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689692014|END|Adding files|",
+      "[OPTRACE]|13175|123|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689692014|START|Configure IP Cache|",
+      "[OPTRACE]|13175|124|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689692015|END|Configure IP Cache|",
+      "[OPTRACE]|13175|125|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689692016|START|synth_design|",
+      "[OPTRACE]|13175|179|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689728396|END|synth_design|",
+      "[OPTRACE]|13175|180|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689728396|START|Write IP Cache|",
+      "[OPTRACE]|13175|184|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729085|END|Write IP Cache|",
+      "[OPTRACE]|13175|185|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729086|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13175|186|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729264|END|write_checkpoint|",
+      "[OPTRACE]|13175|187|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729264|START|synth reports|REPORT",
+      "[OPTRACE]|13175|188|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729395|END|synth reports|",
+      "[OPTRACE]|13175|189|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689729931|END|system_axi_intc_0_0_synth_1|",
+      "[OPTRACE]|13175|82|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689687859|START|system_axi_intc_0_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13175|83|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_axi_intc_0_0_synth_1/system_axi_intc_0_0.tcl|vivado_synth|1729689687860|START|Creating in-memory project|",
+      "[OPTRACE]|13176|126|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689692063|END|Adding files|",
+      "[OPTRACE]|13176|127|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689692064|START|Configure IP Cache|",
+      "[OPTRACE]|13176|128|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689692065|END|Configure IP Cache|",
+      "[OPTRACE]|13176|129|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689692065|START|synth_design|",
+      "[OPTRACE]|13176|144|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689724816|END|synth_design|",
+      "[OPTRACE]|13176|145|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689724816|START|Write IP Cache|",
+      "[OPTRACE]|13176|150|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689725419|END|Write IP Cache|",
+      "[OPTRACE]|13176|151|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689725420|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13176|156|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689725550|END|write_checkpoint|",
+      "[OPTRACE]|13176|157|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689725550|START|synth reports|REPORT",
+      "[OPTRACE]|13176|161|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689725676|END|synth reports|",
+      "[OPTRACE]|13176|164|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689726103|END|system_rst_clk_wiz_299M_0_synth_1|",
+      "[OPTRACE]|13176|90|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689687985|START|system_rst_clk_wiz_299M_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13176|91|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689687986|START|Creating in-memory project|",
+      "[OPTRACE]|13176|98|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689691735|END|Creating in-memory project|",
+      "[OPTRACE]|13176|99|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_299M_0_synth_1/system_rst_clk_wiz_299M_0.tcl|vivado_synth|1729689691735|START|Adding files|",
+      "[OPTRACE]|13177|112|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689691905|END|Creating in-memory project|",
+      "[OPTRACE]|13177|113|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689691905|START|Adding files|",
+      "[OPTRACE]|13177|138|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689692568|END|Adding files|",
+      "[OPTRACE]|13177|139|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689692569|START|Configure IP Cache|",
+      "[OPTRACE]|13177|140|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689692572|END|Configure IP Cache|",
+      "[OPTRACE]|13177|141|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689692573|START|synth_design|",
+      "[OPTRACE]|13177|166|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689726565|END|synth_design|",
+      "[OPTRACE]|13177|167|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689726565|START|Write IP Cache|",
+      "[OPTRACE]|13177|168|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689727467|END|Write IP Cache|",
+      "[OPTRACE]|13177|169|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689727467|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13177|172|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689727715|END|write_checkpoint|",
+      "[OPTRACE]|13177|173|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689727715|START|synth reports|REPORT",
+      "[OPTRACE]|13177|174|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689727854|END|synth reports|",
+      "[OPTRACE]|13177|181|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689728495|END|system_zynq_ultra_ps_e_0_0_synth_1|",
+      "[OPTRACE]|13177|86|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689687894|START|system_zynq_ultra_ps_e_0_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13177|87|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_zynq_ultra_ps_e_0_0_synth_1/system_zynq_ultra_ps_e_0_0.tcl|vivado_synth|1729689687895|START|Creating in-memory project|",
+      "[OPTRACE]|13178|110|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689691871|END|Creating in-memory project|",
+      "[OPTRACE]|13178|111|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689691871|START|Adding files|",
+      "[OPTRACE]|13178|134|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689692295|END|Adding files|",
+      "[OPTRACE]|13178|135|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689692296|START|Configure IP Cache|",
+      "[OPTRACE]|13178|136|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689692331|END|Configure IP Cache|",
+      "[OPTRACE]|13178|137|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689692332|START|synth_design|",
+      "[OPTRACE]|13178|170|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689727541|END|synth_design|",
+      "[OPTRACE]|13178|171|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689727541|START|Write IP Cache|",
+      "[OPTRACE]|13178|175|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728222|END|Write IP Cache|",
+      "[OPTRACE]|13178|176|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728223|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13178|177|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728380|END|write_checkpoint|",
+      "[OPTRACE]|13178|178|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728381|START|synth reports|REPORT",
+      "[OPTRACE]|13178|182|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728509|END|synth reports|",
+      "[OPTRACE]|13178|183|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689728981|END|system_xbar_0_synth_1|",
+      "[OPTRACE]|13178|92|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689687987|START|system_xbar_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13178|93|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_xbar_0_synth_1/system_xbar_0.tcl|vivado_synth|1729689687987|START|Creating in-memory project|",
+      "[OPTRACE]|13179|104|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691853|END|Adding files|",
+      "[OPTRACE]|13179|105|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691854|START|Configure IP Cache|",
+      "[OPTRACE]|13179|106|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691855|END|Configure IP Cache|",
+      "[OPTRACE]|13179|107|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691855|START|synth_design|",
+      "[OPTRACE]|13179|146|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689724862|END|synth_design|",
+      "[OPTRACE]|13179|147|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689724862|START|Write IP Cache|",
+      "[OPTRACE]|13179|152|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689725474|END|Write IP Cache|",
+      "[OPTRACE]|13179|153|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689725475|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13179|158|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689725610|END|write_checkpoint|",
+      "[OPTRACE]|13179|159|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689725610|START|synth reports|REPORT",
+      "[OPTRACE]|13179|162|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689725726|END|synth reports|",
+      "[OPTRACE]|13179|165|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689726177|END|system_rst_clk_wiz_599M_0_synth_1|",
+      "[OPTRACE]|13179|84|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689687882|START|system_rst_clk_wiz_599M_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13179|85|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689687883|START|Creating in-memory project|",
+      "[OPTRACE]|13179|94|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691623|END|Creating in-memory project|",
+      "[OPTRACE]|13179|95|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_rst_clk_wiz_599M_0_synth_1/system_rst_clk_wiz_599M_0.tcl|vivado_synth|1729689691623|START|Adding files|",
+      "[OPTRACE]|13824|192|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689732605|START|system_m01_regslice_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13824|193|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689732605|START|Creating in-memory project|",
+      "[OPTRACE]|13824|201|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736216|END|Creating in-memory project|",
+      "[OPTRACE]|13824|202|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736216|START|Adding files|",
+      "[OPTRACE]|13824|205|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736448|END|Adding files|",
+      "[OPTRACE]|13824|206|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736449|START|Configure IP Cache|",
+      "[OPTRACE]|13824|207|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736450|END|Configure IP Cache|",
+      "[OPTRACE]|13824|208|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689736450|START|synth_design|",
+      "[OPTRACE]|13824|214|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689762840|END|synth_design|",
+      "[OPTRACE]|13824|215|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689762840|START|Write IP Cache|",
+      "[OPTRACE]|13824|216|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689763562|END|Write IP Cache|",
+      "[OPTRACE]|13824|217|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689763563|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13824|218|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689763727|END|write_checkpoint|",
+      "[OPTRACE]|13824|219|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689763727|START|synth reports|REPORT",
+      "[OPTRACE]|13824|220|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689763867|END|synth reports|",
+      "[OPTRACE]|13824|221|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_m01_regslice_0_synth_1/system_m01_regslice_0.tcl|vivado_synth|1729689764391|END|system_m01_regslice_0_synth_1|",
+      "[OPTRACE]|13825|190|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689732596|START|system_auto_cc_0_synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|13825|191|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689732596|START|Creating in-memory project|",
+      "[OPTRACE]|13825|203|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736244|END|Creating in-memory project|",
+      "[OPTRACE]|13825|204|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736244|START|Adding files|",
+      "[OPTRACE]|13825|209|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736477|END|Adding files|",
+      "[OPTRACE]|13825|210|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736477|START|Configure IP Cache|",
+      "[OPTRACE]|13825|211|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736499|END|Configure IP Cache|",
+      "[OPTRACE]|13825|212|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689736500|START|synth_design|",
+      "[OPTRACE]|13825|222|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689767179|END|synth_design|",
+      "[OPTRACE]|13825|223|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689767180|START|Write IP Cache|",
+      "[OPTRACE]|13825|224|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689767900|END|Write IP Cache|",
+      "[OPTRACE]|13825|225|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689767901|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|13825|226|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689768076|END|write_checkpoint|",
+      "[OPTRACE]|13825|227|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689768076|START|synth reports|REPORT",
+      "[OPTRACE]|13825|228|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689768205|END|synth reports|",
+      "[OPTRACE]|13825|229|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/system_auto_cc_0_synth_1/system_auto_cc_0.tcl|vivado_synth|1729689768740|END|system_auto_cc_0_synth_1|",
+      "[OPTRACE]|14789|238|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690028834|START|synth_1|ROLLUP_AUTO",
+      "[OPTRACE]|14789|239|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690028835|START|Creating in-memory project|",
+      "[OPTRACE]|14789|240|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690032316|END|Creating in-memory project|",
+      "[OPTRACE]|14789|241|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690032316|START|Adding files|",
+      "[OPTRACE]|14789|242|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690033343|END|Adding files|",
+      "[OPTRACE]|14789|243|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690033345|START|synth_design|",
+      "[OPTRACE]|14789|244|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058674|END|synth_design|",
+      "[OPTRACE]|14789|245|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058675|START|write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|14789|246|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058888|END|write_checkpoint|",
+      "[OPTRACE]|14789|247|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058888|START|synth reports|REPORT",
+      "[OPTRACE]|14789|248|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058889|END|synth reports|",
+      "[OPTRACE]|14789|249|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/synth_1/system_wrapper.tcl|vivado_synth|1729690058889|END|synth_1|",
+      "[OPTRACE]|15005|251|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690067325|START|impl_1|ROLLUP_1",
+      "[OPTRACE]|15005|252|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690067325|START|Phase: Init Design|ROLLUP_AUTO",
+      "[OPTRACE]|15005|253|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690067325|START|Design Initialization: pre hook|",
+      "[OPTRACE]|15005|254|ipirun.tcl|vpl|1729690067336|START|ipirun|ROLLUP_0",
+      "[OPTRACE]|15005|255|ipirun.tcl|vpl|1729690067336|END|ipirun|",
+      "[OPTRACE]|15005|256|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690067336|END|Design Initialization: pre hook|",
+      "[OPTRACE]|15005|257|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690067337|START|create in-memory project|",
+      "[OPTRACE]|15005|258|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690070000|END|create in-memory project|",
+      "[OPTRACE]|15005|259|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690070000|START|set parameters|",
+      "[OPTRACE]|15005|260|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690070820|END|set parameters|",
+      "[OPTRACE]|15005|261|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690070820|START|add files|",
+      "[OPTRACE]|15005|262|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690071846|START|read constraints: implementation|",
+      "[OPTRACE]|15005|263|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690071847|END|read constraints: implementation|",
+      "[OPTRACE]|15005|264|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690071847|END|add files|",
+      "[OPTRACE]|15005|265|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690071847|START|link_design|",
+      "[OPTRACE]|15005|266|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129125|END|link_design|",
+      "[OPTRACE]|15005|267|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129125|START|gray box cells|",
+      "[OPTRACE]|15005|268|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129125|END|gray box cells|",
+      "[OPTRACE]|15005|269|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129125|START|Design Initialization: post hook|",
+      "[OPTRACE]|15005|270|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129143|END|Design Initialization: post hook|",
+      "[OPTRACE]|15005|271|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129143|START|init_design_reports|REPORT",
+      "[OPTRACE]|15005|272|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129143|END|init_design_reports|",
+      "[OPTRACE]|15005|273|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129143|START|init_design_write_hwdef|",
+      "[OPTRACE]|15005|274|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129143|END|init_design_write_hwdef|",
+      "[OPTRACE]|15005|275|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129144|END|Phase: Init Design|",
+      "[OPTRACE]|15005|276|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129144|START|Phase: Opt Design|ROLLUP_AUTO",
+      "[OPTRACE]|15005|277|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690129144|START|Opt Design: pre hook|",
+      "[OPTRACE]|15005|278|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690131325|END|Opt Design: pre hook|",
+      "[OPTRACE]|15005|279|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690131325|START|read constraints: opt_design|",
+      "[OPTRACE]|15005|280|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690131325|END|read constraints: opt_design|",
+      "[OPTRACE]|15005|281|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690131325|START|opt_design|",
+      "[OPTRACE]|15005|282|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156539|END|opt_design|",
+      "[OPTRACE]|15005|283|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156539|START|read constraints: opt_design_post|",
+      "[OPTRACE]|15005|284|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156539|END|read constraints: opt_design_post|",
+      "[OPTRACE]|15005|285|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156539|START|Opt Design: post hook|",
+      "[OPTRACE]|15005|286|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|END|Opt Design: post hook|",
+      "[OPTRACE]|15005|287|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|START|opt_design reports|REPORT",
+      "[OPTRACE]|15005|288|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|END|opt_design reports|",
+      "[OPTRACE]|15005|289|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|END|Phase: Opt Design|",
+      "[OPTRACE]|15005|290|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|START|Phase: Place Design|ROLLUP_AUTO",
+      "[OPTRACE]|15005|291|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156540|START|Place Design: pre hook|",
+      "[OPTRACE]|15005|292|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156556|END|Place Design: pre hook|",
+      "[OPTRACE]|15005|293|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156556|START|read constraints: place_design|",
+      "[OPTRACE]|15005|294|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156556|END|read constraints: place_design|",
+      "[OPTRACE]|15005|295|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690156556|START|place_design|",
+      "[OPTRACE]|15005|296|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690495905|END|place_design|",
+      "[OPTRACE]|15005|297|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690495905|START|read constraints: place_design_post|",
+      "[OPTRACE]|15005|298|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690495905|END|read constraints: place_design_post|",
+      "[OPTRACE]|15005|299|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690495905|START|Place Design: post hook|",
+      "[OPTRACE]|15005|300|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500753|END|Place Design: post hook|",
+      "[OPTRACE]|15005|301|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500754|START|place_design reports|REPORT",
+      "[OPTRACE]|15005|302|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500754|END|place_design reports|",
+      "[OPTRACE]|15005|303|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500754|END|Phase: Place Design|",
+      "[OPTRACE]|15005|304|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500754|START|Phase: Physical Opt Design|ROLLUP_AUTO",
+      "[OPTRACE]|15005|305|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500754|START|read constraints: phys_opt_design|",
+      "[OPTRACE]|15005|306|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500755|END|read constraints: phys_opt_design|",
+      "[OPTRACE]|15005|307|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690500755|START|phys_opt_design|",
+      "[OPTRACE]|15005|308|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518524|END|phys_opt_design|",
+      "[OPTRACE]|15005|309|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518524|START|read constraints: phys_opt_design_post|",
+      "[OPTRACE]|15005|310|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518524|END|read constraints: phys_opt_design_post|",
+      "[OPTRACE]|15005|311|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|START|phys_opt_design report|REPORT",
+      "[OPTRACE]|15005|312|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|END|phys_opt_design report|",
+      "[OPTRACE]|15005|313|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|END|Phase: Physical Opt Design|",
+      "[OPTRACE]|15005|314|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|START|Phase: Route Design|ROLLUP_AUTO",
+      "[OPTRACE]|15005|315|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|START|read constraints: route_design|",
+      "[OPTRACE]|15005|316|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|END|read constraints: route_design|",
+      "[OPTRACE]|15005|317|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729690518525|START|route_design|",
+      "[OPTRACE]|15005|318|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691178207|END|route_design|",
+      "[OPTRACE]|15005|319|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691178207|START|read constraints: route_design_post|",
+      "[OPTRACE]|15005|320|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691178207|END|read constraints: route_design_post|",
+      "[OPTRACE]|15005|321|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691178208|START|Route Design: post hook|",
+      "[OPTRACE]|15005|322|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691195377|END|Route Design: post hook|",
+      "[OPTRACE]|15005|323|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691195377|START|Route Design: write_checkpoint|CHECKPOINT",
+      "[OPTRACE]|15005|324|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691215241|END|Route Design: write_checkpoint|",
+      "[OPTRACE]|15005|325|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691215241|START|route_design reports|REPORT",
+      "[OPTRACE]|15005|326|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220788|END|route_design reports|",
+      "[OPTRACE]|15005|327|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220788|START|route_design misc|",
+      "[OPTRACE]|15005|328|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220788|END|route_design misc|",
+      "[OPTRACE]|15005|329|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220789|END|Phase: Route Design|",
+      "[OPTRACE]|15005|330|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220789|START|Phase: Write Bitstream|ROLLUP_AUTO",
+      "[OPTRACE]|15005|331|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220789|START|write_bitstream setup|",
+      "[OPTRACE]|15005|332|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691220789|START|Write Bitstream: pre hook|",
+      "[OPTRACE]|15005|333|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691222130|END|Write Bitstream: pre hook|",
+      "[OPTRACE]|15005|334|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691222131|START|read constraints: write_bitstream|",
+      "[OPTRACE]|15005|335|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691222131|END|read constraints: write_bitstream|",
+      "[OPTRACE]|15005|336|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691222485|END|write_bitstream setup|",
+      "[OPTRACE]|15005|337|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691222485|START|write_bitstream|",
+      "[OPTRACE]|15005|338|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691247756|END|write_bitstream|",
+      "[OPTRACE]|15005|339|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691247756|START|write_bitstream misc|",
+      "[OPTRACE]|15005|340|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691247756|START|read constraints: write_bitstream_post|",
+      "[OPTRACE]|15005|341|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691247756|END|read constraints: write_bitstream_post|",
+      "[OPTRACE]|15005|342|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691247756|START|Write Bitstream: post hook|",
+      "[OPTRACE]|15005|343|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691288297|END|Write Bitstream: post hook|",
+      "[OPTRACE]|15005|344|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691288343|END|write_bitstream misc|",
+      "[OPTRACE]|15005|345|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691288343|END|Phase: Write Bitstream|",
+      "[OPTRACE]|15005|346|/home/abhidan/Documents/2024/kria-vitis-platforms/kv260/overlays/examples/benchmark/binary_container_1/link/vivado/vpl/prj/prj.runs/impl_1/system_wrapper.tcl|vivado_impl|1729691288344|END|impl_1|"
+      ];
+
+  var legendData = [
+  { "title": "Report Generation",
+    "color": "#b9783f"
+  }, {
+    "title": "Write Checkpoint",
+    "color": "#cd82ad"
+  },
+  {
+    "title": "Incomplete Data",
+    "color": "#cc4748"
+  } ];
+
+  // -- Convert Raw data into something we can use ---------------------------
+  console.log("Convert log data (%s entries) to Javascript 'JSON' objects...", csvData.length);
+  var jsonData = csvArrayToJSON(header, csvData, "|");
+
+  // -- Clean up the JSON objects --------------------------------------------
+  for (var i = 0; i < jsonData.length; i++) {
+    jsonData[i].Action = jsonData[i].Action.toUpperCase();
+    jsonData[i].Tags = jsonData[i].Tags.toUpperCase();
+    jsonData[i].Tags = jsonData[i].Tags.trim();
+    jsonData[i].TimeStampMSec = parseInt(jsonData[i].TimeStampMSec, 10);
+    jsonData[i].pid = parseInt(jsonData[i].pid, 10);
+  }
+
+  // -- Sort JSON array ------------------------------------------------------
+  console.log("Sorting JSON objects (%s objects) according to timestamps...", jsonData.length);
+  jsonData.sort(compareByTimeStamp);
+
+  // Record the PID grouping order
+  var pidOrder = new Map();
+  for (var i = 0; i < jsonData.length; i++) {
+    if (pidOrder.has(jsonData[i].pid) == false) {
+      pidOrder.set(jsonData[i].pid, i);    // Simple ordering (lower is first)
+    }
+  }
+
+  // -- Create secondary data array for the chart data array -----------------
+  console.log("Preparing graph data...");
+
+  // Task limits
+  var m_startTS = 0;      // Earliest Timestamp
+  var m_endTS = 0;        // Latest Timestamp
+
+  if (jsonData.length > 0) {
+    m_startTS = jsonData[0].TimeStampMSec;
+    m_endTS = jsonData[jsonData.length - 1].TimeStampMSec;
+  }
+
+
+  var chartData = [ ];   // Empty JSON array
+
+
+  populateChartData();
+  tableCreate( chartData );
+
+  filterChartEntries();
+
+  // -- Search for "holes"
+  // -- Sort by common PID
+  // -- Create groupings by process
+
+  console.log("done");
+
+  var chart = AmCharts.makeChart("chartdiv", {
+    "type": "gantt",
+    "theme": "light",
+    "titles": [
+    { "text": "OPTrace", "size": 15}],
+    "marginRight": 70,
+    "period": "fff",                                     // X-Axis
+    "balloonDateFormat": "JJ:NN:SS",
+    "columnWidth": 0.5,                                 // Bar thickness
+    "valueAxis": {
+      "type": "numeric",
+      "title": "Time [HH:MM:SS]",
+      "duration": "ss",
+      "durationUnits": { DD: 'd. ', hh: ':', mm: ':', ss: '' },
+    },
+    "brightnessStep": 10,
+    "graph": {
+      "fillAlphas": 1,
+      "labelFunction": barLabelCallBack,
+      "labelText": " ",
+      "labelPosition": "right",
+      "balloonFunction": ballonLabelCallBack,
+      "balloonText": "<p align='left'> Task: [[task]]<br/>Start:[[start]]<br/>End:[[end]]<br/>Duration:[[duration]]</p>",
+      "bulletField": "bullet",
+      "bulletSize": 8
+    },
+    "rotate": true,
+    "categoryField": "category",
+    "segmentsField": "segments",
+    "colorField": "color",
+    "startDate": "2015-01-01 00:00:00",
+    "startField": "start",
+    "endField": "end",
+    "durationField": "duration",
+    "dataProvider": chartData,
+    "valueScrollbar": {
+      "autoGridCount": true
+    },
+    "chartScrollbar": {
+      "enable": true
+    },
+    "chartCursor": {
+      "cursorColor": "#55bb76",
+      "valueBalloonsEnabled": false,
+      "cursorAlpha": 0.1,
+      "valueLineAlpha": 0.5,
+      "valueLineBalloonEnabled": true,
+      "valueLineEnabled": true,
+      "zoomable": true,
+      "valueZoomable": true,
+      "fullWidth": true
+    },
+    "legend": {
+      "data": legendData,
+    },
+    "export": {
+      "enabled": true
+    }
+  });
+
+  // =========================================================================
+  // Call back methods
+  // =========================================================================
+function ballonLabelCallBack( _graphDataItem )
+{
+  var start = _graphDataItem.values.open;
+  var end = _graphDataItem.values.value;
+  var duration = end - start;
+
+  var result = "<p align='left'>Task: " + _graphDataItem.category + "<br/>Start: " + secondsToHHMMSS(start) + "<br/>End: " + secondsToHHMMSS( end ) + "<br/>Duration: " + secondsToHHMMSS( duration ) + "</p>";
+  return result;
+}
+
+
+function barLabelCallBack( _graphDataItem )
+{
+   var duration = _graphDataItem.values.value - _graphDataItem.values.open;
+
+   return secondsToHHMMSS( duration);
+}
+
+
+function userInputFormCallback()
+{
+  // Second filter
+  m_secondFilter = document.getElementById("userDurationFilterSecInput").value;
+  console.log("Setting second filter to: " + m_secondFilter + " seconds");
+
+  // Group PID Sort
+  m_groupPidSort = document.getElementById("userGroupPidSortSelected").checked;
+  console.log("Group PID filter is set to: " + m_groupPidSort);
+
+  // Rollup filter
+  m_showRollup = document.getElementById("userRollupSelected").checked;
+  console.log("Rollup filter is set to: " + m_showRollup);
+
+  // Individual filter
+  m_showIndividualEntry = document.getElementById("userIndividualEntrySelected").checked;
+  console.log("Individual filter is set to: " + m_showIndividualEntry);
+
+  // Checkpoint Report Entries filter
+  m_showCheckpointEntry = document.getElementById("userCheckpointEntrySelected").checked;
+  console.log("Checkpoint Entry filter is set to: " + m_showCheckpointEntry);
+
+  // Checkpoint Report Entries filter
+  m_showReportEntry = document.getElementById("userReportEntrySelected").checked;
+  console.log("Report Entry filter is set to: " + m_showReportEntry);
+
+  populateChartData();
+  filterChartEntries()
+  chart.dataProvider = chartData;
+  chart.validateData();
+}
+
+  // =========================================================================
+  // Utilities
+  // =========================================================================
+
+
+function populateChartData()
+{
+  chartData = [ ];
+  if (m_groupPidSort == false) {
+    jsonData.sort(compareByTimeStamp);
+  } else {
+    jsonData.sort(compareByGroupTimeStamp);
+  }
+
+  for (var i = 0; i < jsonData.length; i++) {
+    var timestamp = parseInt(jsonData[0].TimeStampMSec, 10);
+
+    if (m_startTS > timestamp) m_startTS = timestamp;
+    if (m_endTS < timestamp) m_endTS = timestamp;
+
+    for (var i = 0; i < jsonData.length; i++) {
+      switch (jsonData[i].Action) {
+      case "START":
+        var categoryEntry = { };
+        categoryEntry["category"] = jsonData[i].Task;
+        categoryEntry["pid"] = jsonData[i].pid;
+
+        var segmentEntry = { };
+        // Normalize entry and convert to seconds
+        segmentEntry["start"] = (jsonData[i].TimeStampMSec - m_startTS) / 1000;
+        segmentEntry["color"] = getTaskBarColor(jsonData[i].Tags)
+        segmentEntry["task"] = jsonData[i].Task;
+        segmentEntry["tags"] = jsonData[i].Tags;
+        segmentEntry["duration"] = -1;
+
+        categoryEntry["segments"] = [ ];
+        categoryEntry["segments"].push(segmentEntry);
+        chartData.push(categoryEntry);
+        break;
+
+      case "END":
+        var catagory = findCatagory(jsonData[i].pid, jsonData[i].Task, chartData);
+        if (catagory != null) {
+          var segmentsEntry = catagory.segments[0];
+          segmentsEntry["end"] = (jsonData[i].TimeStampMSec - m_startTS) / 1000;
+          segmentsEntry["duration"] = segmentsEntry.end - segmentsEntry.start;
+        } else {
+          console.log("Null entry found: pid:%s, Task: %s", jsonData[i].pid, jsonData[i].Task);
+        }
+
+        break;
+
+      default:
+        console.log("Default");
+        break;
+      }
+    }
+  }
+}
+
+function filterChartEntries()
+{
+  for(var i = chartData.length - 1; i >= 0; i--) {
+    var segment = chartData[i].segments[0];
+
+    // -- Remove entries less than 1 seconds
+    if ( segment["duration"] == -1) {
+      segment["bullet"] = "xError";
+      segment["color"] = "#cc4748";
+      segment["duration"] = ((m_endTS - m_startTS) / 1000) - segment["start"];
+    } else if (segment["duration"] <  m_secondFilter) {
+      chartData.splice(i, 1);
+      continue;
+    }
+  
+
+    // Filter by tags
+    var bHasRollup = false;
+    var bHasCheckpoint = false;
+    var bHasReport = false;
+
+    var tags = segment["tags"];
+    console.log("Tag: " + tags);
+    if (tags.search(/ROLLUP_/i) != -1) { bHasRollup = true; }
+    if (tags.search(/CHECKPOINT/i) != -1) { bHasCheckpoint = true; }
+    if (tags.search(/REPORT/i) != -1) { bHasReport = true; }
+
+    var bRemoveEntry = false;
+
+    // Remove rollups
+    if ((m_showRollup == false) && (bHasRollup == true)) {
+      bRemoveEntry = true;
+    }
+    
+    // Remove checkpoints    
+    if ((m_showCheckpointEntry == false) && (bHasCheckpoint == true)) {
+      bRemoveEntry = true;
+    }
+
+    // Remove reports
+    if ((m_showReportEntry == false) && (bHasReport == true)) {
+      bRemoveEntry = true;
+    }
+
+    // Remove individual entry
+    if (((m_showIndividualEntry == false) && 
+         ((bHasRollup == false) &&
+          (bHasCheckpoint == false) &&
+          (bHasReport == false)))) {
+      bRemoveEntry = true;
+    }
+
+    if (bRemoveEntry == true) {
+      chartData.splice(i, 1);
+      continue;
+    }
+  }
+
+  console.log("ChartData.length: " + chartData.length);
+}
+
+
+function getTaskBarColor( _tags )
+{
+  if (_tags == null)
+    return "#8dc49f";
+
+  if (_tags.search(/ROLLUP_AUTO/i) != -1){ return "#0099ff"; }
+  if (_tags.search(/ROLLUP_0/i) != -1)   { return "#006699"; }
+  if (_tags.search(/ROLLUP_1/i) != -1)   { return "#009933"; }
+  if (_tags.search(/ROLLUP_2/i) != -1)   { return "#66ccff"; }
+  if (_tags.search(/REPORT/i) != -1)     { return "#b9783f"; }
+  if (_tags.search(/CHECKPOINT/i) != -1) { return "#cd82ad"; }
+
+  return "#8dc49f"
+}
+
+
+function tableCreate( _chartData ){
+    var myTableDiv = document.getElementById("myDynamicTable");
+
+
+    for ( var i = 0; i < _chartData.length; i++) {
+      var tr = myTableDiv.insertRow();
+
+      var td_task = tr.insertCell();
+      td_task.appendChild(document.createTextNode( _chartData[i].category ));
+
+      var segmentEntry = _chartData[i].segments;
+      var td_start = tr.insertCell();
+      td_start.appendChild(document.createTextNode( secondsToHHMMSS(segmentEntry[0].start) ));
+
+      var td_duration = tr.insertCell();
+      td_duration.appendChild(document.createTextNode( secondsToHHMMSS(segmentEntry[0].duration) ));
+
+    }
+}
+
+function secondsToHHMMSS( _seconds )
+{
+  var hours = Math.floor(_seconds / 3600);
+  var minutes = Math.floor(_seconds % 3600 / 60);
+  var seconds = Math.floor(_seconds % 3600 % 60);
+
+  var result = hours + ":" + (minutes < 10 ? "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds; 
+
+  return result;
+}
+
+
+  function findCatagory(_pid, _category, _catagoryArray) {
+    for (var i = (_catagoryArray.length - 1); i >= 0; i--) {
+      if (_pid == _catagoryArray[i].pid) {
+        if (_catagoryArray[i].category == _category) {
+          return  _catagoryArray[i];
+        }
+      }
+    }
+    return null;
+  }
+
+
+  // Compares the timestamps between to JSON objects
+  function compareByTimeStamp(_a, _b) {
+    if (_a.TimeStampMSec < _b.TimeStampMSec) return -1;
+    if (_a.TimeStampMSec > _b.TimeStampMSec) return 1;
+
+    if (_a.pid == _b.pid) {
+      if ((_a.Action == "START") && (_b.Action == "END")) return -1;
+      if ((_a.Action == "END") && (_b.Action == "START")) return 1;
+
+      if(_a.Entry < _b.Entry) return -1;
+      if(_a.Entry > _b.Entry) return 1;
+    }
+
+    return 0;
+  }
+
+
+  // Compares the timestamps between to JSON objects
+  function compareByGroupTimeStamp(_a, _b) {
+    if (pidOrder.get(_a.pid) < pidOrder.get(_b.pid)) return -1;
+
+    if (pidOrder.get(_a.pid) > pidOrder.get(_b.pid)) return 1;
+
+    return compareByTimeStamp(_a, _b);
+  }
+
+
+  // Return array of string values, or NULL if CSV string not well formed.
+  function CSVtoArray(_text, _sep) {
+    // Regex expressions
+    var re_valid_default = /^\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*(?:,\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*)*$/;
+    var re_value_default = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\S\s][^'\\]*)*)'|"([^"\\]*(?:\\[\S\s][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
+    var re_special_default = /,\s*$/;
+
+    // Algorithm:
+    //   1) Convert regex expression to a string.
+    //   2) Remove leading regex escape character (e.g., '\')
+    //   3) Remove training regex escape character(s) (e.g., '\' or "\g")
+    //   4) Replace the comma (',') character witht he new delimiter character
+    //   5) Build the regex command
+
+    // Check delimiter, if special insert escapes
+    if (_sep == "|") _sep = "\\|";
+
+    var re_valid = new RegExp(re_valid_default.toString().substr(1).slice(0, -1).replace(/,/g, _sep));
+    var re_value = new RegExp(re_value_default.toString().substr(1).slice(0, -2).replace(/,/g, _sep), 'g');
+    var re_special = new RegExp(re_special_default.toString().substr(1).slice(0, -1).replace(/,/g, _sep));
+
+    // Validate the input string to determine if it is well formed
+    if (!re_valid.test(_text)) return null;
+
+    var a = [ ];                     // Initialize array to receive values.
+    _text.replace(re_value,           // "Walk" the string using replace with callback.
+                  function(m0, m1, m2, m3) {
+                      // Remove backslash from \' in single quoted values.
+                      if      (m1 !== undefined) a.push(m1.replace(/\\'/g, "'"));
+                      // Remove backslash from \" in double quoted values.
+                      else if (m2 !== undefined) a.push(m2.replace(/\\"/g, '"'));
+                      else if (m3 !== undefined) a.push(m3);
+                      return ''; // Return empty string.
+                  });
+
+    // Handle special case of empty last value.
+    if (re_special.test(_text)) a.push('');
+
+    return a;
+  };
+
+
+  // Converts the given CSV array & header into a JSON array
+  function csvArrayToJSON(_header, _csvArray, _sep) {
+    var result = [ ];
+    var headers = CSVtoArray(_header, _sep);
+
+    for (var i = 0; i < _csvArray.length; i++) {
+
+      var obj = { };
+      var currentline = CSVtoArray(_csvArray[i], _sep);
+
+      for (var j = 0; j < headers.length; j++) {
+        obj[headers[j]] = currentline[j];
+      }
+
+      result.push(obj);
+
+    }
+
+    return result; //JavaScript object
+  }
+
+
+</script>
+</body>
+
+</html>
+
