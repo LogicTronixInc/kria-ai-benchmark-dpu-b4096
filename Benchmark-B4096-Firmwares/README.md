@@ -8,9 +8,11 @@ We also have provided the necessary firmware here at this directory. We have pro
 
 
 ## Ready to use firmware from Xilinx
-You can also get the fimrware at here: https://github.com/Xilinx/kria-apps-firmware/tree/xlnx_rel_v2022.2/boards/kv260/benchmark-b4096
+You can also get the fimrware at here:\
+ https://github.com/Xilinx/kria-apps-firmware/tree/xlnx_rel_v2022.2/boards/kv260/benchmark-b4096
 
-Either you can prepare firmware in Host PC (Linux/Ubuntu) or you have to follow this for compiling the firmware in target: https://github.com/Xilinx/kria-apps-firmware/tree/xlnx_rel_v2022.2?tab=readme-ov-file#runtime-on-xilinx-target
+Either you can prepare firmware in Host PC (Linux/Ubuntu) or you have to follow this for compiling the firmware in target:\
+ https://github.com/Xilinx/kria-apps-firmware/tree/xlnx_rel_v2022.2?tab=readme-ov-file#runtime-on-xilinx-target
 
 \
 For any questions or queries, please write us at: info@logictronix.com

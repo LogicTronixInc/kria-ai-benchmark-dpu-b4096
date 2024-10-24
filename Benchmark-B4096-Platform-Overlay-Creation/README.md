@@ -5,7 +5,7 @@
 2. Petalinux 2022.2 
 
 ## Steps to Follow to run benchmark-b4096 overlay
-Note: you can also check [Benchmark-B4096-BUILD-LOG-Oct23-2024.sh](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/master/Benchmark-B4096-Platform-Overlay-Creation/Benchmark-B4096-BUILD-LOG-Oct23-2024.sh), this build log has the all the commands run in terminal from git clone to make command.
+**Note:** you can also check [Benchmark-B4096-BUILD-LOG-Oct23-2024.sh](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/master/Benchmark-B4096-Platform-Overlay-Creation/Benchmark-B4096-BUILD-LOG-Oct23-2024.sh), this build log has the all the commands run in terminal from git clone to make command.
 
 **Steps:**
 1. First clone github: 
@@ -31,16 +31,16 @@ Note: you can also check [Benchmark-B4096-BUILD-LOG-Oct23-2024.sh](https://githu
 # Block Design after adding Vitis DPU Accelerator 
 Here is the Block design snippet which is taken by opening the VIVADO design in which DPU accelerator has been already added by Vitis while running make command.
 
-![Benchmark-B4096-Block-Design-snippet](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/master/Benchmark-B4096-Platform-Overlay-Creation/images/Benchmark-B4096-Block-Design-snippet.png) 
+![Benchmark-B4096-Block-Design-snippet](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/main/Benchmark-B4096-Platform-Overlay-Creation/images/Benchmark-B4096-Block-Design-snippet.png) 
 
 
 # Resource Usage by Benchmark B4096 in KV260
 
 ## Following picture shows the resource usage by B4096 DPU in KV260 
-![Benchmark-B4096-Resource-Usage](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/master/Benchmark-B4096-Platform-Overlay-Creation/images/Benchmark-B4096-Resource-Usage.png)  
+![Benchmark-B4096-Resource-Usage](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/main/Benchmark-B4096-Platform-Overlay-Creation/images/Benchmark-B4096-Resource-Usage.png)  
 
 ## Complete Resource Utilization Report
-[benchmark-b4096-resource-utilization_report.txt](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/master/Benchmark-B4096-Platform-Overlay-Creation/benchmark-b4096-resource-utilization_report.txt) 
+[benchmark-b4096-resource-utilization_report.txt](https://github.com/LogicTronixInc/kria-ai-benchmark-dpu-b4096/blob/main/Benchmark-B4096-Platform-Overlay-Creation/benchmark-b4096-resource-utilization_report.txt) 
 
 \
 For any questions or queries, please write us at: info@logictronix.com
